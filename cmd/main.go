@@ -1,9 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"tg-listener/configs"
 )
 
 func main() {
-	fmt.Println("hello world")
+	config, err := configs.MustConfig()
+	if err != nil {
+		if config != nil {
+
+		}
+	}
 }
