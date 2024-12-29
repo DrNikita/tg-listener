@@ -38,7 +38,6 @@ func MonitorChannel(channelUsername string) {
 		}
 	}`))
 
-
 	// Поиск канала
 	C.td_json_client_send(client, C.CString(fmt.Sprintf(`{
       "@type": "searchPublicChat",
@@ -80,5 +79,5 @@ func MonitorChannel(channelUsername string) {
 func extractChatID(response string) int64 {
 	// Логика для извлечения ID чата из JSON-ответа
 	fmt.Println(response)
-	return 123456789 // Замените на реальную логику
+	return 123456789
 }
