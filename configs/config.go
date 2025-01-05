@@ -5,14 +5,17 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
-type Config struct {
-	TgToken string `envconfig:"TG_TOKEN"`
+type TgConfig struct {
+	ApiID   int    `envconfig:"api_id"`
+	ApiHash string `envconfig:"api_hash"`
+	PhoneNumber string `envconfig:"phone_number"`
+	AuthCode string `envconfig:"auth_code"`
 }
 
-func MustConfig() (*Config, error) {
-	var config Config
+func MustConfig() (*TgConfig, error) {
+	var config TgConfig
 
-	err := envconfig.Process("", &config)
+	err := envconfig.Process("tg", &config)
 	if err != nil {
 		return nil, err
 	}
