@@ -94,7 +94,7 @@ func main() {
 		Logger: logger,
 	}
 
-	ok, err := channelRepository.Subscribe("@cryptobrelgin")
+	ok, err := channelRepository.Subscribe(tgConfigs.TestChatTag)
 	if err != nil {
 		log.Fatal(err)
 	}

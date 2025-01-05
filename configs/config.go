@@ -10,6 +10,7 @@ type TgConfig struct {
 	ApiHash     string `envconfig:"api_hash"`
 	PhoneNumber string `envconfig:"phone_number"`
 	AuthCode    string `envconfig:"auth_code"`
+	TestChatTag string `envconfig:"chat_tag"`
 }
 
 func MustConfig() (*TgConfig, error) {
