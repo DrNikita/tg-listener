@@ -1,46 +1,106 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"log"
+	"log/slog"
+	"path/filepath"
+	"tg-listener/configs"
+	"tg-listener/internal/telegram"
+	"time"
 
-	"github.com/aliforever/go-tdlib"
-	"github.com/aliforever/go-tdlib/config"
+	"github.com/zelenin/go-tdlib/client"
 )
 
 func main() {
-	
+	logger := slog.Default()
 
-
-	managerHandlers := tdlib.NewManagerHandlers().
-		SetRawIncomingEventHandler(func(eventBytes []byte) {
-			fmt.Println(string(eventBytes))
-		})
-
-	managerOptions := tdlib.NewManagerOptions().
-		SetLogVerbosityLevel(6).
-		SetLogPath("logs.txt")
-
-	// Or you can pass nil for both handlers and options
-	m := tdlib.NewManager(context.Background(), managerHandlers, managerOptions)
-
-	// NewClientOptions
-	cfg := config.New().
-		SetFilesDirectory("./tdlib/tdlib-files").
-		SetDatabaseDirectory("./tdlib/tdlib-db")
-
-	h := tdlib.NewHandlers().
-		SetRawIncomingEventHandler(func(eventBytes []byte) {
-			fmt.Println(string(eventBytes))
-		})
-
-	apiID := int64(26790193)
-	apiHash := "966d04d7114486eef7d5b9bb69f0948a"
-
-	client := m.NewClient(apiID, apiHash, h, cfg, nil)
-
-	err := client.ReceiveUpdates(context.Background())
+	tgConfigs, err := configs.MustConfig()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
+
+	tdlibParameters := &client.SetTdlibParametersRequest{
+		UseTestDc:           false,
+		DatabaseDirectory:   filepath.Join(".tdlib", "database"),
+		FilesDirectory:      filepath.Join(".tdlib", "files"),
+		UseFileDatabase:     true,
+		UseChatInfoDatabase: true,
+		UseMessageDatabase:  true,
+		UseSecretChats:      false,
+		ApiId:               tgConfigs.ApiID,
+		ApiHash:             tgConfigs.ApiHash,
+		SystemLanguageCode:  "en",
+		DeviceModel:         "Server",
+		SystemVersion:       "1.0.0",
+		ApplicationVersion:  "1.0.0",
+	}
+	// client authorizer
+	authorizer := client.ClientAuthorizer(tdlibParameters)
+	go client.CliInteractor(authorizer)
+
+	// or bot authorizer
+	// botToken := "000000000:gsVCGG5YbikxYHC7bP5vRvmBqJ7Xz6vG6td"
+	// authorizer := client.BotAuthorizer(tdlibParameters, botToken)
+
+	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
+		NewVerbosityLevel: 1,
+	})
+	if err != nil {
+		log.Fatalf("SetLogVerbosityLevel error: %s", err)
+	}
+
+	tdlibClient, err := client.NewClient(authorizer)
+	if err != nil {
+		log.Fatalf("NewClient error: %s", err)
+	}
+
+	versionOption, err := client.GetOption(&client.GetOptionRequest{
+		Name: "version",
+	})
+	if err != nil {
+		log.Fatalf("GetOption error: %s", err)
+	}
+
+	commitOption, err := client.GetOption(&client.GetOptionRequest{
+		Name: "commit_hash",
+	})
+	if err != nil {
+		log.Fatalf("GetOption error: %s", err)
+	}
+
+	log.Printf("TDLib version: %s (commit: %s)", versionOption.(*client.OptionValueString).Value, commitOption.(*client.OptionValueString).Value)
+
+	me, err := tdlibClient.GetMe()
+	if err != nil {
+		log.Fatalf("GetMe error: %s", err)
+	}
+
+	defer func() {
+		meta, err := tdlibClient.Destroy()
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+		logger.Info("user was successfully destroed", "@type", meta.Type)
+	}()
+
+	log.Printf("Me: %s %s", me.FirstName, me.LastName)
+
+	channelRepository := telegram.ChannelRepository{
+		Me:     me,
+		Client: tdlibClient,
+		Config: tgConfigs,
+		Logger: logger,
+	}
+
+	ok, err := channelRepository.Subscribe("@cryptobrelgin")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(ok.Type)
+	fmt.Println(ok.Extra)
+	fmt.Println(ok.ClientId)
+	time.Sleep(20 * time.Second)
 }

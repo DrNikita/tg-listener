@@ -6,10 +6,10 @@ import (
 )
 
 type TgConfig struct {
-	ApiID   int    `envconfig:"api_id"`
-	ApiHash string `envconfig:"api_hash"`
+	ApiID       int32  `envconfig:"api_id"`
+	ApiHash     string `envconfig:"api_hash"`
 	PhoneNumber string `envconfig:"phone_number"`
-	AuthCode string `envconfig:"auth_code"`
+	AuthCode    string `envconfig:"auth_code"`
 }
 
 func MustConfig() (*TgConfig, error) {
