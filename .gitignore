@@ -3,3 +3,4 @@ logs.txt
 *.exe
 td/
 .tdlib
+.vscode/
