@@ -1,19 +1,20 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"tg-listener/configs"
 	"tg-listener/internal/telegram"
-	"time"
 
 	"github.com/zelenin/go-tdlib/client"
 )
 
 func main() {
-	logger := slog.Default()
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+	}))
 
 	tgConfigs, err := configs.MustConfig()
 	if err != nil {
@@ -87,20 +88,14 @@ func main() {
 
 	log.Printf("Me: %s %s", me.FirstName, me.LastName)
 
-	channelRepository := telegram.ChannelRepository{
-		Me:     me,
-		Client: tdlibClient,
-		Config: tgConfigs,
-		Logger: logger,
-	}
+	var channelWorker telegram.TgChatWorker
 
-	ok, err := channelRepository.Subscribe(tgConfigs.TestChatTag)
+	chatList := make(map[int64]*client.Chat)
+
+	channelWorker = telegram.NewTelegramRepository(tdlibClient, chatList, tgConfigs, logger)
+
+	_, err = channelWorker.Subscribe(tgConfigs.TestChatTag)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println(ok.Type)
-	fmt.Println(ok.Extra)
-	fmt.Println(ok.ClientId)
-	time.Sleep(20 * time.Second)
 }
