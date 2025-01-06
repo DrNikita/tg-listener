@@ -88,11 +88,11 @@ func main() {
 
 	log.Printf("Me: %s %s", me.FirstName, me.LastName)
 
+	////////////////////////////////////////////////////////////////////
+
 	var channelWorker telegram.TgChatWorker
 
-	chatList := make(map[int64]*client.Chat)
-
-	channelWorker = telegram.NewTelegramRepository(tdlibClient, chatList, tgConfigs, logger)
+	channelWorker = telegram.NewTelegramRepository(tdlibClient, tgConfigs, logger)
 
 	_, err = channelWorker.Subscribe(tgConfigs.TestChatTag)
 	if err != nil {
