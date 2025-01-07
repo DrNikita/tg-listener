@@ -1,82 +1,50 @@
 package main
 
 import (
+	"context"
 	"log"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"tg-listener/configs"
+	"tg-listener/internal/db"
 	"tg-listener/internal/telegram"
+	"time"
 
-	"github.com/zelenin/go-tdlib/client"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		AddSource: true,
 	}))
 
-	tgConfigs, err := configs.MustConfig()
+	tgConfigs, mongoConfigs, err := configs.MustConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tdlibParameters := &client.SetTdlibParametersRequest{
-		UseTestDc:           false,
-		DatabaseDirectory:   filepath.Join(".tdlib", "database"),
-		FilesDirectory:      filepath.Join(".tdlib", "files"),
-		UseFileDatabase:     true,
-		UseChatInfoDatabase: true,
-		UseMessageDatabase:  true,
-		UseSecretChats:      false,
-		ApiId:               tgConfigs.ApiID,
-		ApiHash:             tgConfigs.ApiHash,
-		SystemLanguageCode:  "en",
-		DeviceModel:         "Server",
-		SystemVersion:       "1.0.0",
-		ApplicationVersion:  "1.0.0",
-	}
-	// client authorizer
-	authorizer := client.ClientAuthorizer(tdlibParameters)
-	go client.CliInteractor(authorizer)
+	mongoClient, _ := mongo.Connect(options.Client().ApplyURI(mongoConfigs.Uri))
+	defer func() {
+		if err = mongoClient.Disconnect(ctx); err != nil {
+			logger.Error(err.Error())
+			log.Fatal(err)
+		}
+	}()
 
-	// or bot authorizer
-	// botToken := "000000000:gsVCGG5YbikxYHC7bP5vRvmBqJ7Xz6vG6td"
-	// authorizer := client.BotAuthorizer(tdlibParameters, botToken)
-
-	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
-		NewVerbosityLevel: 1,
-	})
+	err = mongoClient.Ping(ctx, readpref.Primary())
 	if err != nil {
-		log.Fatalf("SetLogVerbosityLevel error: %s", err)
+		logger.Error(err.Error())
+		log.Fatal(err)
 	}
 
-	tdlibClient, err := client.NewClient(authorizer)
-	if err != nil {
-		log.Fatalf("NewClient error: %s", err)
-	}
-
-	versionOption, err := client.GetOption(&client.GetOptionRequest{
-		Name: "version",
-	})
-	if err != nil {
-		log.Fatalf("GetOption error: %s", err)
-	}
-
-	commitOption, err := client.GetOption(&client.GetOptionRequest{
-		Name: "commit_hash",
-	})
-	if err != nil {
-		log.Fatalf("GetOption error: %s", err)
-	}
-
-	log.Printf("TDLib version: %s (commit: %s)", versionOption.(*client.OptionValueString).Value, commitOption.(*client.OptionValueString).Value)
-
-	me, err := tdlibClient.GetMe()
-	if err != nil {
-		log.Fatalf("GetMe error: %s", err)
-	}
-
+	var tgClientAuthorizer telegram.TgClientAuthorizer
+	tgClientAuthorizer = telegram.NewClientRepository(tgConfigs, logger)
+	tdlibClient, _, err := tgClientAuthorizer.Authorize()
 	defer func() {
 		meta, err := tdlibClient.Destroy()
 		if err != nil {
@@ -86,14 +54,12 @@ func main() {
 		logger.Info("user was successfully destroed", "@type", meta.Type)
 	}()
 
-	log.Printf("Me: %s %s", me.FirstName, me.LastName)
-
-	////////////////////////////////////////////////////////////////////
-
+	var storageWorker db.StorageWorker
 	var channelWorker telegram.TgChatWorker
 
-	channelWorker = telegram.NewTelegramRepository(tdlibClient, tgConfigs, logger)
+	storageWorker = db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
 
+	channelWorker = telegram.NewTelegramRepository(tdlibClient, &storageWorker, tgConfigs, logger)
 	_, err = channelWorker.Subscribe(tgConfigs.TestChatTag)
 	if err != nil {
 		log.Fatal(err)

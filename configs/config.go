@@ -5,7 +5,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
-type TgConfig struct {
+type TgConfigs struct {
 	ApiID       int32  `envconfig:"api_id"`
 	ApiHash     string `envconfig:"api_hash"`
 	PhoneNumber string `envconfig:"phone_number"`
@@ -13,13 +13,23 @@ type TgConfig struct {
 	TestChatTag string `envconfig:"chat_tag"`
 }
 
-func MustConfig() (*TgConfig, error) {
-	var config TgConfig
+type MongoConfigs struct {
+	Uri string `envconfig:"MONGO_URI"`
+}
 
-	err := envconfig.Process("tg", &config)
+func MustConfig() (*TgConfigs, *MongoConfigs, error) {
+	var tgConfigs TgConfigs
+	var mongoConfigs MongoConfigs
+
+	err := envconfig.Process("tg", &tgConfigs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &config, nil
+	err = envconfig.Process("db", &mongoConfigs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &tgConfigs, &mongoConfigs, nil
 }
