@@ -70,13 +70,13 @@ func (tr chatRepository) InitListeningChats() error {
 	listeningChatTags := []string{
 		"@evelone192gg",
 	}
-	var listeningChats []db.TgListeningChats
+	var listeningChats []db.TgListeningChat
 
 	for _, chatTag := range listeningChatTags {
 		chatId, err := tr.getChatId(chatTag)
 		if err != nil {
 			tr.logger.Error(err.Error())
-			listeningChats = append(listeningChats, db.TgListeningChats{
+			listeningChats = append(listeningChats, db.TgListeningChat{
 				Tag: chatTag,
 				Id:  chatId,
 			})
