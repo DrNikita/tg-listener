@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
@@ -28,7 +28,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mongoClient, _ := mongo.Connect(options.Client().ApplyURI(mongoConfigs.Uri))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoConfigs.Uri))
+	if err != nil {
+		logger.Error("error connecting to mongo DB", "err", err)
+		log.Fatal(err)
+	}
+
 	defer func() {
 		if err = mongoClient.Disconnect(ctx); err != nil {
 			logger.Error(err.Error())
@@ -44,7 +49,7 @@ func main() {
 
 	var tgClientAuthorizer telegram.TgClientAuthorizer
 	tgClientAuthorizer = telegram.NewClientRepository(tgConfigs, logger)
-	tdlibClient, _, err := tgClientAuthorizer.Authorize()
+	tdlibClient, me, err := tgClientAuthorizer.Authorize()
 	defer func() {
 		meta, err := tdlibClient.Destroy()
 		if err != nil {
@@ -59,9 +64,9 @@ func main() {
 
 	storageWorker = db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
 
-	channelWorker = telegram.NewTelegramRepository(tdlibClient, &storageWorker, tgConfigs, logger)
-	_, err = channelWorker.Subscribe(tgConfigs.TestChatTag)
-	if err != nil {
+	channelWorker = telegram.NewTelegramRepository(me, tdlibClient, &storageWorker, tgConfigs, logger)
+
+	if err := channelWorker.InitialSubscribe(); err != nil {
 		log.Fatal(err)
 	}
 }

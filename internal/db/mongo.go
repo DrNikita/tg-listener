@@ -2,14 +2,18 @@ package db
 
 import (
 	"context"
+	"errors"
+	"log"
 	"log/slog"
 	"tg-listener/configs"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type StorageWorker interface {
 	InitListeningChats(listteningChats ListeningChats) error
+	GetListeningChats(userId int64) (*ListeningChats, error)
 }
 
 type MongoRepository struct {
@@ -38,4 +42,22 @@ func (mr *MongoRepository) InitListeningChats(listteningChats ListeningChats) er
 	}
 
 	return nil
+}
+
+func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, error) {
+	chats := mr.client.Database("listening").Collection("chats")
+
+	var listeningChats ListeningChats
+
+	filter := bson.D{{"user_id", userId}}
+	err := chats.FindOne(mr.ctx, filter).Decode(&listeningChats)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		// Do something when no record was found
+	} else if err != nil {
+		log.Fatal(err)
+	}
+
+	mr.logger.Info("listening chats", "chats", len(listeningChats.ListeningChats))
+
+	return &listeningChats, nil
 }

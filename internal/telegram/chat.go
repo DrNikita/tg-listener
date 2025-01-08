@@ -10,10 +10,11 @@ import (
 
 type TgChatWorker interface {
 	Subscribe(chatTag string) (*client.Chat, error)
-	InitListeningChats() error
+	InitialSubscribe() error
 }
 
 type chatRepository struct {
+	me       *client.User
 	client   *client.Client
 	chatList map[string]int64
 	store    db.StorageWorker
@@ -21,14 +22,47 @@ type chatRepository struct {
 	logger   *slog.Logger
 }
 
-func NewTelegramRepository(client *client.Client, store *db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger) chatRepository {
+func NewTelegramRepository(me *client.User, client *client.Client, store *db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger) chatRepository {
 	return chatRepository{
+		me:       me,
 		client:   client,
 		chatList: make(map[string]int64),
 		store:    *store,
 		config:   config,
 		logger:   logger,
 	}
+}
+
+func (tr chatRepository) InitialSubscribe() error {
+	listeningChats, err := tr.store.GetListeningChats(tr.me.Id)
+	if err != nil {
+		tr.logger.Error("error getting listening chats from db", "err", err)
+	}
+
+	if listeningChats != nil {
+		for _, listeningChat := range listeningChats.ListeningChats {
+			tr.chatList[listeningChat.Tag] = listeningChat.Id
+		}
+
+		return nil
+	}
+
+	listeningChatTags := []string{
+		"@evelone192gg",
+	}
+
+	for _, chatTag := range listeningChatTags {
+		_, err := tr.Subscribe(chatTag)
+		if err != nil {
+			tr.logger.Error("coulnt subscrite to chat", "chat_tag", chatTag, "err", err)
+		}
+	}
+
+	if err := tr.initListeningChats(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (tr chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
@@ -52,39 +86,18 @@ func (tr chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 	return chat, nil
 }
 
-func (tr chatRepository) getChatId(chatTag string) (int64, error) {
-	chat, err := tr.client.SearchPublicChat(&client.SearchPublicChatRequest{
-		Username: chatTag,
-	})
-	if err != nil {
-		tr.logger.Error("Chat not found", "err", err)
-		return 0, err
-	}
-
-	tr.logger.Info("Chat found", "chatId", chat.Id)
-
-	return chat.Id, nil
-}
-
-func (tr chatRepository) InitListeningChats() error {
-	listeningChatTags := []string{
-		"@evelone192gg",
-	}
+func (tr chatRepository) initListeningChats() error {
 	var listeningChats []db.TgListeningChat
 
-	for _, chatTag := range listeningChatTags {
-		chatId, err := tr.getChatId(chatTag)
-		if err != nil {
-			tr.logger.Error(err.Error())
-			listeningChats = append(listeningChats, db.TgListeningChat{
-				Tag: chatTag,
-				Id:  chatId,
-			})
-		}
+	for chatTag, chatId := range tr.chatList {
+		listeningChats = append(listeningChats, db.TgListeningChat{
+			Tag: chatTag,
+			Id:  chatId,
+		})
 	}
 
 	initialChats := db.ListeningChats{
-		UserId:         000,
+		UserId:         tr.me.Id,
 		ListeningChats: listeningChats,
 	}
 	if err := tr.store.InitListeningChats(initialChats); err != nil {
@@ -93,4 +106,18 @@ func (tr chatRepository) InitListeningChats() error {
 	}
 
 	return nil
+}
+
+func (tr chatRepository) getChatId(chatTag string) (int64, error) {
+	chat, err := tr.client.SearchPublicChat(&client.SearchPublicChatRequest{
+		Username: chatTag,
+	})
+	if err != nil {
+		tr.logger.Error("Chat not found", "chat_tag", chatTag, "err", err)
+		return 0, err
+	}
+
+	tr.logger.Info("Chat found", "chatId", chat.Id)
+
+	return chat.Id, nil
 }
