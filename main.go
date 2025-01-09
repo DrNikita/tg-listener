@@ -59,12 +59,9 @@ func main() {
 		logger.Info("user was successfully destroed", "@type", meta.Type)
 	}()
 
-	var storageWorker db.StorageWorker
-	var channelWorker telegram.TgChatWorker
+	storageWorker := db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
 
-	storageWorker = db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
-
-	channelWorker = telegram.NewTelegramRepository(me, tdlibClient, &storageWorker, tgConfigs, logger)
+	channelWorker := telegram.NewTelegramRepository(me, tdlibClient, storageWorker, tgConfigs, logger)
 
 	if err := channelWorker.InitialSubscribe(); err != nil {
 		log.Fatal(err)

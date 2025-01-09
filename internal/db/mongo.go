@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"errors"
-	"log"
 	"log/slog"
 	"tg-listener/configs"
 
@@ -12,7 +10,7 @@ import (
 )
 
 type StorageWorker interface {
-	InitListeningChats(listteningChats ListeningChats) error
+	InsertInitialtListeningChats(listteningChats ListeningChats) error
 	GetListeningChats(userId int64) (*ListeningChats, error)
 }
 
@@ -32,7 +30,7 @@ func NewMongoRepository(client *mongo.Client, config *configs.MongoConfigs, logg
 	}
 }
 
-func (mr *MongoRepository) InitListeningChats(listteningChats ListeningChats) error {
+func (mr *MongoRepository) InsertInitialtListeningChats(listteningChats ListeningChats) error {
 	chats := mr.client.Database("listening").Collection("chats")
 
 	_, err := chats.InsertOne(mr.ctx, listteningChats)
@@ -51,13 +49,16 @@ func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, err
 
 	filter := bson.D{{"user_id", userId}}
 	err := chats.FindOne(mr.ctx, filter).Decode(&listeningChats)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		// Do something when no record was found
-	} else if err != nil {
-		log.Fatal(err)
+	if err != nil {
+		return nil, err
 	}
+	// if errors.Is(err, mongo.ErrNoDocuments) {
+	// 	// Do something when no record was found
+	// } else if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	mr.logger.Info("listening chats", "chats", len(listeningChats.ListeningChats))
+	mr.logger.Info("listening chats", "chats____________", len(listeningChats.ListeningChats))
 
 	return &listeningChats, nil
 }
