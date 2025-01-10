@@ -63,7 +63,7 @@ func main() {
 
 	channelWorker := telegram.NewTelegramRepository(me, tdlibClient, storageWorker, tgConfigs, logger)
 
-	if err := channelWorker.InitialSubscribe(); err != nil {
+	if err := channelWorker.InitInitialSubscriptions(); err != nil {
 		log.Fatal(err)
 	}
 }

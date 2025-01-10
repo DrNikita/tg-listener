@@ -52,11 +52,6 @@ func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, err
 	if err != nil {
 		return nil, err
 	}
-	// if errors.Is(err, mongo.ErrNoDocuments) {
-	// 	// Do something when no record was found
-	// } else if err != nil {
-	// 	log.Fatal(err)
-	// }
 
 	mr.logger.Info("listening chats", "chats____________", len(listeningChats.ListeningChats))
 

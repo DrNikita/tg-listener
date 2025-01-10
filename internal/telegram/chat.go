@@ -1,16 +1,18 @@
 package telegram
 
 import (
+	"errors"
 	"log/slog"
 	"tg-listener/configs"
 	"tg-listener/internal/db"
 
 	"github.com/zelenin/go-tdlib/client"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type TgChatWorker interface {
+	InitInitialSubscriptions() error
 	Subscribe(chatTag string) (*client.Chat, error)
-	InitialSubscribe() error
 }
 
 type chatRepository struct {
@@ -33,9 +35,29 @@ func NewTelegramRepository(me *client.User, client *client.Client, store db.Stor
 	}
 }
 
-func (tr *chatRepository) InitialSubscribe() error {
+// initialization of initial subscriptions
+func (tr *chatRepository) InitInitialSubscriptions() error {
 	listeningChats, err := tr.store.GetListeningChats(tr.me.Id)
-	if err != nil {
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		// list of initial chats for listening
+		listeningChatTags := []string{
+			"@evelone192gg",
+			"@FlattyBy",
+			"@-----incorrect_chat_tag-----)",
+		}
+
+		for _, chatTag := range listeningChatTags {
+			_, err := tr.Subscribe(chatTag)
+			if err != nil {
+				tr.logger.Error("coulnt subscrite to chat", "chat_tag", chatTag, "err", err)
+			}
+		}
+
+		if err := tr.initListeningChats(); err != nil {
+			return err
+		}
+
+	} else if err != nil {
 		tr.logger.Error("error getting listening chats from db", "err", err)
 	}
 
@@ -45,23 +67,6 @@ func (tr *chatRepository) InitialSubscribe() error {
 		}
 
 		return nil
-	}
-
-	listeningChatTags := []string{
-		"@evelone192gg",
-		"@FlattyBy",
-		"@хуйня_рандомная)",
-	}
-
-	for _, chatTag := range listeningChatTags {
-		_, err := tr.Subscribe(chatTag)
-		if err != nil {
-			tr.logger.Error("coulnt subscrite to chat", "chat_tag", chatTag, "err", err)
-		}
-	}
-
-	if err := tr.initListeningChats(); err != nil {
-		return err
 	}
 
 	return nil
@@ -88,6 +93,7 @@ func (tr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 	return chat, nil
 }
 
+// service functions for saving listening chats
 func (tr *chatRepository) initListeningChats() error {
 	var listeningChats []db.TgListeningChat
 
