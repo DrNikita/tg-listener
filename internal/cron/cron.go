@@ -33,14 +33,28 @@ func (cr *CronRepository) Start(clientId int64) {
 		return
 	}
 
+	// errPull := make(chan error, 10)
+
 	for _, chat := range avaliableChats.ListeningChats {
-		messages, err := cr.chatWorker.GetNewMessages(chat.Id)
-		if err != nil {
-			cr.logger.Error("error getting messages", "err", err)
-			continue
-		}
-		//TODO: kafka mb??
+
+		go func() {
+			messages, err := cr.chatWorker.GetNewMessages(chat.Id)
+			if err != nil {
+				cr.logger.Error("error getting messages", "err", err)
+
+			}
+
+			if len(messages.Messages) == 0 {
+				cr.logger.Info("no new messeges found")
+				return
+			}
+
+			//TODO: kafka mb??
+		}()
 	}
 
-	cr.logger.Info("Cron started")
+	// for err := range errPull {
+	// }
+
+	cr.logger.Info("cron_monitoring started")
 }
