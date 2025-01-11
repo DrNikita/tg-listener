@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"tg-listener/configs"
 	"tg-listener/internal/db"
@@ -13,6 +14,15 @@ import (
 type TgChatWorker interface {
 	InitInitialSubscriptions() error
 	Subscribe(chatTag string) (*client.Chat, error)
+	GetNewMessages(chatId int64) (*client.Messages, error)
+}
+
+type NoMessagesError struct {
+	ChatId int64
+}
+
+func (e NoMessagesError) Error() string {
+	return fmt.Sprintf("no new messages found for chat: chat_id: %d", e.ChatId)
 }
 
 type chatRepository struct {
@@ -72,10 +82,11 @@ func (tr *chatRepository) InitInitialSubscriptions() error {
 	return nil
 }
 
+// TODO: refactor: remove *client.Chat as returnning param: seems like chat param is only need to check chatTag
 func (tr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 	chatId, err := tr.getChatId(chatTag)
 	if err != nil {
-		tr.logger.Error("Chat id not found", "err", err)
+		tr.logger.Error("chat id not found", "err", err)
 		return nil, err
 	}
 
@@ -83,14 +94,73 @@ func (tr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 		ChatId: chatId,
 	})
 	if err != nil {
-		tr.logger.Error("Get chat error", "err", err)
+		tr.logger.Error("get chat error", "err", err)
 		return nil, err
 	}
 
 	tr.chatList[chatTag] = chatId
-	tr.logger.Info("Chat subscribed", "chat", chatTag)
+	tr.logger.Info("chat subscribed", "chat", chatTag)
 
 	return chat, nil
+}
+
+// get new message since last messages request
+func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error) {
+	messages, err := tr.client.GetChatHistory(&client.GetChatHistoryRequest{
+		ChatId:        chatId,
+		FromMessageId: 0,
+		Offset:        0,
+		Limit:         10,
+	})
+	if err != nil {
+		tr.logger.Error("get chat messages history error", "err", err)
+		return nil, err
+	}
+
+	if messages == nil || len(messages.Messages) == 0 {
+		tr.logger.Info("no messages were found")
+
+		return nil, NoMessagesError{
+			ChatId: chatId,
+		}
+	}
+
+	tr.logger.Info("messages were successfully got", "total messages count", messages.TotalCount)
+
+	// important to save this to get rid of duplicated requests with the same messages ->
+	// -> return error if failed to inserte/update
+	lastMessage, err := tr.store.GetChatLastMessage(chatId)
+	if err != nil {
+		err = tr.store.InsertLastMessage(db.LastMessage{
+			ChatId:        chatId,
+			LastMessageId: messages.Messages[0].Id,
+		})
+		if err != nil {
+			tr.logger.Error("failed to save last message to mongo db", "err", err)
+			return nil, err
+		}
+
+		return messages, nil
+
+	} else {
+		_, err = tr.store.UpdateLastMessage(db.LastMessage{
+			ChatId:        chatId,
+			LastMessageId: messages.Messages[0].Id,
+		})
+		if err != nil {
+			tr.logger.Error("failed to update last message in mongo db", "err", err)
+			return nil, err
+		}
+	}
+
+	for messageId, message := range messages.Messages {
+		if message.Id == lastMessage.LastMessageId {
+			messages.Messages = messages.Messages[:messageId]
+			return messages, nil
+		}
+	}
+
+	return messages, nil
 }
 
 // service functions for saving listening chats
