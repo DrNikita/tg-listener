@@ -6,6 +6,7 @@ services:
       - '27017:27017'
     volumes:
       - dbdata6:/data/db
+ 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     environment:
@@ -22,27 +23,6 @@ services:
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
     networks:
       - kafka-network
-
-  tg-listener:
-    build:
-      context: ./
-      dockerfile: Dockerfile
-    depends_on:
-      - kafka
-    networks:
-      - kafka-network
-    ports:
-      - "8080:8080"
-
-
-  # second-microservice:
-  #   build:
-  #     context: ./second-microservice
-  #     dockerfile: Dockerfile
-  #   depends_on:
-  #     - kafka
-  #   networks:
-  #     - kafka-network
 
 networks:
   kafka-network:
