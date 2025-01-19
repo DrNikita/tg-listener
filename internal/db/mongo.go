@@ -9,6 +9,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
+const (
+	AppCollectionName string = "tg_listener"
+	ChatsColleaction  string = "chats"
+	MessageCollection string = "last_message"
+)
+
 type StorageWorker interface {
 	InsertInitialtListeningChats(listteningChats ListeningChats) error
 	GetListeningChats(userId int64) (*ListeningChats, error)
@@ -34,7 +40,7 @@ func NewMongoRepository(client *mongo.Client, config *configs.MongoConfigs, logg
 }
 
 func (mr *MongoRepository) InsertInitialtListeningChats(listteningChats ListeningChats) error {
-	chats := mr.client.Database("listening").Collection("chats")
+	chats := mr.client.Database(AppCollectionName).Collection(ChatsColleaction)
 
 	_, err := chats.InsertOne(mr.ctx, listteningChats)
 	if err != nil {
@@ -46,7 +52,7 @@ func (mr *MongoRepository) InsertInitialtListeningChats(listteningChats Listenin
 }
 
 func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, error) {
-	chats := mr.client.Database("listening").Collection("chats")
+	chats := mr.client.Database(AppCollectionName).Collection(ChatsColleaction)
 
 	var listeningChats ListeningChats
 
@@ -56,13 +62,13 @@ func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, err
 		return nil, err
 	}
 
-	mr.logger.Info("listening chats", "chats____________", len(listeningChats.ListeningChats))
+	mr.logger.Info("listening chats", "amount", len(listeningChats.ListeningChats))
 
 	return &listeningChats, nil
 }
 
 func (mr *MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error) {
-	message := mr.client.Database("listening").Collection("last_message")
+	message := mr.client.Database(AppCollectionName).Collection(MessageCollection)
 
 	var lastMessage LastMessage
 
@@ -77,7 +83,7 @@ func (mr *MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error
 }
 
 func (mr *MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
-	message := mr.client.Database("listening").Collection("last_message")
+	message := mr.client.Database(AppCollectionName).Collection(MessageCollection)
 
 	_, err := message.InsertOne(mr.ctx, lastMessage)
 	if err != nil {
@@ -91,7 +97,7 @@ func (mr *MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
 }
 
 func (mr *MongoRepository) UpdateLastMessage(lastMessage LastMessage) (*mongo.UpdateResult, error) {
-	message := mr.client.Database("listening").Collection("last_message")
+	message := mr.client.Database(AppCollectionName).Collection(MessageCollection)
 
 	chatIdFilter := bson.D{{"chat_id", lastMessage.ChatId}}
 	update := bson.D{{"$set", lastMessage}}

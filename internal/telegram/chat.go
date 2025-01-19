@@ -52,6 +52,7 @@ func (tr *chatRepository) InitInitialSubscriptions() error {
 		// list of initial chats for listening
 		listeningChatTags := []string{
 			"@evelone192gg",
+			"@FlattyBy",
 		}
 
 		for _, chatTag := range listeningChatTags {
