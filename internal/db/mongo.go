@@ -62,12 +62,16 @@ func (mr *MongoRepository) GetListeningChats(userId int64) (*ListeningChats, err
 }
 
 func (mr *MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error) {
-	chats := mr.client.Database("listening").Collection("chats")
+	message := mr.client.Database("listening").Collection("last_message")
 
 	var lastMessage LastMessage
 
 	chatIdFilter := bson.D{{"chat_id", chatId}}
-	err := chats.FindOne(mr.ctx, chatIdFilter).Decode(&lastMessage)
+	err := message.FindOne(mr.ctx, chatIdFilter).Decode(&lastMessage)
+	if err.Error() == mongo.ErrNoDocuments.Error() {
+		mr.logger.Info("error", "not documents found", "err", err)
+		return nil, nil
+	}
 	if err != nil {
 		mr.logger.Error("failed to get last message", "err", err)
 		return nil, err
@@ -77,7 +81,7 @@ func (mr *MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error
 }
 
 func (mr *MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
-	chats := mr.client.Database("listening").Collection("chats")
+	chats := mr.client.Database("listening").Collection("last_message")
 
 	_, err := chats.InsertOne(mr.ctx, lastMessage)
 	if err != nil {
@@ -89,11 +93,20 @@ func (mr *MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
 }
 
 func (mr *MongoRepository) UpdateLastMessage(lastMessage LastMessage) (*mongo.UpdateResult, error) {
-	chats := mr.client.Database("listening").Collection("chats")
+	message := mr.client.Database("listening").Collection("last_message")
 
 	chatIdFilter := bson.D{{"chat_id", lastMessage.ChatId}}
 
-	updateResult, err := chats.UpdateOne(mr.ctx, chatIdFilter, lastMessage)
+	update := bson.D{
+		{"$set", bson.M{
+			"chat_id":         lastMessage.ChatId,
+			"last_message_id": lastMessage.LastMessageId,
+			"offset":          lastMessage.Offset,
+		},
+		},
+	}
+
+	updateResult, err := message.UpdateOne(mr.ctx, chatIdFilter, update)
 	if err != nil {
 		mr.logger.Error(err.Error())
 		return nil, err

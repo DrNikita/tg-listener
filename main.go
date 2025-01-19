@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"tg-listener/configs"
+	"tg-listener/internal/cron"
 	"tg-listener/internal/db"
 	"tg-listener/internal/telegram"
 	"time"
@@ -66,4 +67,7 @@ func main() {
 	if err := channelWorker.InitInitialSubscriptions(); err != nil {
 		log.Fatal(err)
 	}
+
+	cronRepository := cron.NewCronRepository(channelWorker, storageWorker, logger, ctx)
+	cronRepository.Start(me.Id)
 }

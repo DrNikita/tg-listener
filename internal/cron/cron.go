@@ -3,6 +3,8 @@ package cron
 import (
 	"context"
 	"log/slog"
+	"strconv"
+	"sync"
 	"tg-listener/internal/db"
 	"tg-listener/internal/telegram"
 )
@@ -32,16 +34,24 @@ func (cr *CronRepository) Start(clientId int64) {
 		cr.logger.Error("error getting listening chats", "err", err)
 		return
 	}
+	if len(avaliableChats.ListeningChats) == 0 {
+		cr.logger.Error("error getting listening chats")
+		return
+	}
 
 	// errPull := make(chan error, 10)
+	wg := sync.WaitGroup{}
 
 	for _, chat := range avaliableChats.ListeningChats {
 
+		wg.Add(1)
 		go func() {
-			messages, err := cr.chatWorker.GetNewMessages(chat.Id)
+			defer wg.Done()
+			cr.logger.Info("chat_id", chat.Id, "chat_tag", chat.Tag)
+			messages, err := cr.chatWorker.GetNewMessages(chat.Tag)
 			if err != nil {
 				cr.logger.Error("error getting messages", "err", err)
-
+				return
 			}
 
 			if len(messages.Messages) == 0 {
@@ -49,7 +59,9 @@ func (cr *CronRepository) Start(clientId int64) {
 				return
 			}
 
-			//TODO: kafka mb??
+			for _, message := range messages.Messages {
+				cr.logger.Info(strconv.FormatBool(message.CanBeSaved))
+			}
 		}()
 	}
 
@@ -57,4 +69,5 @@ func (cr *CronRepository) Start(clientId int64) {
 	// }
 
 	cr.logger.Info("cron_monitoring started")
+	wg.Wait()
 }

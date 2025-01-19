@@ -14,7 +14,7 @@ import (
 type TgChatWorker interface {
 	InitInitialSubscriptions() error
 	Subscribe(chatTag string) (*client.Chat, error)
-	GetNewMessages(chatId int64) (*client.Messages, error)
+	GetNewMessages(chatTag string) (*client.Messages, error)
 }
 
 type NoMessagesError struct {
@@ -52,8 +52,6 @@ func (tr *chatRepository) InitInitialSubscriptions() error {
 		// list of initial chats for listening
 		listeningChatTags := []string{
 			"@evelone192gg",
-			"@FlattyBy",
-			"@-----incorrect_chat_tag-----)",
 		}
 
 		for _, chatTag := range listeningChatTags {
@@ -105,15 +103,19 @@ func (tr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 }
 
 // get new message since last messages request
-func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error) {
+func (tr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, error) {
+	chat, err := tr.client.SearchPublicChat(&client.SearchPublicChatRequest{
+		Username: chatTag,
+	})
+
 	messages, err := tr.client.GetChatHistory(&client.GetChatHistoryRequest{
-		ChatId:        chatId,
+		ChatId:        chat.Id,
 		FromMessageId: 0,
 		Offset:        0,
 		Limit:         10,
 	})
 	if err != nil {
-		tr.logger.Error("get chat messages history error", "err", err)
+		tr.logger.Error("get chat messages history error", "chat_id", chatTag, "err", err)
 		return nil, err
 	}
 
@@ -121,7 +123,7 @@ func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error)
 		tr.logger.Info("no messages were found")
 
 		return nil, NoMessagesError{
-			ChatId: chatId,
+			ChatId: chat.Id,
 		}
 	}
 
@@ -129,10 +131,10 @@ func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error)
 
 	// important to save this to get rid of duplicated requests with the same messages ->
 	// -> return error if failed to inserte/update
-	lastMessage, err := tr.store.GetChatLastMessage(chatId)
+	lastMessage, err := tr.store.GetChatLastMessage(chat.Id)
 	if err != nil {
 		err = tr.store.InsertLastMessage(db.LastMessage{
-			ChatId:        chatId,
+			ChatId:        chat.Id,
 			LastMessageId: messages.Messages[0].Id,
 		})
 		if err != nil {
@@ -144,7 +146,7 @@ func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error)
 
 	} else {
 		_, err = tr.store.UpdateLastMessage(db.LastMessage{
-			ChatId:        chatId,
+			ChatId:        chat.Id,
 			LastMessageId: messages.Messages[0].Id,
 		})
 		if err != nil {
@@ -153,10 +155,12 @@ func (tr *chatRepository) GetNewMessages(chatId int64) (*client.Messages, error)
 		}
 	}
 
-	for messageId, message := range messages.Messages {
-		if message.Id == lastMessage.LastMessageId {
-			messages.Messages = messages.Messages[:messageId]
-			return messages, nil
+	if lastMessage != nil {
+		for messageId, message := range messages.Messages {
+			if message.Id == lastMessage.LastMessageId {
+				messages.Messages = messages.Messages[:messageId]
+				return messages, nil
+			}
 		}
 	}
 
