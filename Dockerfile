@@ -17,3 +17,15 @@ RUN git clone https://github.com/tdlib/td.git && \
     cmake --build . --target install -j 2 && \
     cd / && \
     rm -rf /td/
+
+# ENV CGO_ENABLED=1
+# ENV CGO_CFLAGS="-I/usr/local/td/tdlib/include"
+# ENV CGO_LDFLAGS="-L/usr/local/td/tdlib/bin -ltdjson"
+
+# COPY go.mod go.sum ./
+# RUN go mod download
+# COPY . .
+
+# RUN go build -trimpath -ldflags="-s -w" -o tg-listener.exe main.go
+
+# CMD ["/usr/local/tg-listener", "-n", "--debug"]
