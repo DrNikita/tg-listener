@@ -41,9 +41,16 @@ func (cr *clientRepository) Authorize() (*client.Client, *client.User, error) {
 		SystemVersion:       "1.0.0",
 		ApplicationVersion:  "1.0.0",
 	}
+
 	// client authorizer
 	authorizer := client.ClientAuthorizer(tdlibParameters)
-	go client.CliInteractor(authorizer)
+	phoneChan := make(chan string, 1)
+	passChan := make(chan string, 1)
+	go func() {
+		authorizer.PhoneNumber = phoneChan
+		authorizer.Password = passChan
+		client.CliInteractor(authorizer)
+	}()
 
 	// or bot authorizer
 	// botToken := "000000000:gsVCGG5YbikxYHC7bP5vRvmBqJ7Xz6vG6td"

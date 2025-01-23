@@ -8,17 +8,36 @@ import (
 )
 
 type httpRepository struct {
-	chat   telegram.TgChatWorker
-	logger *slog.Logger
+	tgClientAuthorizer telegram.TgClientAuthorizer
+	chat               telegram.TgChatWorker
+	logger             *slog.Logger
 }
 
-func NewHttpRepository(chat telegram.TgChatWorker, logger *slog.Logger) httpRepository {
+func NewHttpRepository(tgClientAuthorizer telegram.TgClientAuthorizer, chat telegram.TgChatWorker, logger *slog.Logger) httpRepository {
 	return httpRepository{
-		chat:   chat,
-		logger: logger,
+		tgClientAuthorizer: tgClientAuthorizer,
+		chat:               chat,
+		logger:             logger,
 	}
 }
 
-func (hr httpRepository) AddListenableChat(c fiber.Ctx) error {
+func (hr *httpRepository) SetupRouts(app *fiber.App) {
+	mainGroup := app.Group("/api/v1")
+	mainGroup.Post("/authorize", hr.AuthorizeTgUser)
+}
+
+func (hr httpRepository) AuthorizeTgUser(c fiber.Ctx) error {
+	//get phone/pass
+
+	tdlibClient, me, err := hr.tgClientAuthorizer.Authorize()
+	defer func() {
+		meta, err := tdlibClient.Destroy()
+		if err != nil {
+			hr.logger.Error(err.Error())
+			return
+		}
+		hr.logger.Info("user was successfully destroed", "@type", meta.Type)
+	}()
+
 	return nil
 }
