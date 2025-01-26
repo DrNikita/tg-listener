@@ -29,15 +29,5 @@ func (hr *httpRepository) SetupRouts(app *fiber.App) {
 func (hr httpRepository) AuthorizeTgUser(c fiber.Ctx) error {
 	//get phone/pass
 
-	tdlibClient, me, err := hr.tgClientAuthorizer.Authorize()
-	defer func() {
-		meta, err := tdlibClient.Destroy()
-		if err != nil {
-			hr.logger.Error(err.Error())
-			return
-		}
-		hr.logger.Info("user was successfully destroed", "@type", meta.Type)
-	}()
-
 	return nil
 }

@@ -2,18 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"tg-listener/configs"
-	"tg-listener/internal/cron"
-	"tg-listener/internal/db"
-	"tg-listener/internal/http"
 	"tg-listener/internal/telegram"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/zelenin/go-tdlib/client"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -28,7 +23,7 @@ func main() {
 		AddSource: true,
 	}))
 
-	httpConfigs, tgConfigs, mongoConfigs, err := configs.MustConfig()
+	_, tgConfigs, mongoConfigs, err := configs.MustConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,6 +50,16 @@ func main() {
 	var tgClientAuthorizer telegram.TgClientAuthorizer
 	tgClientAuthorizer = telegram.NewClientRepository(tgConfigs, logger)
 
+	tdlibClient, _, err := tgClientAuthorizer.Authorize()
+	defer func() {
+		meta, err := tdlibClient.Destroy()
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+		logger.Info("user was successfully destroed", "@type", meta.Type)
+	}()
+
 	tdlibClientChan := make(chan *client.Client)
 	meChan := make(chan *client.User)
 	defer func() {
@@ -64,24 +69,24 @@ func main() {
 
 	///// must be block for all api if user unauthorized
 
-	storageWorker := db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
+	// storageWorker := db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
 
-	channelWorker := telegram.NewTelegramRepository(me, tdlibClient, storageWorker, tgConfigs, logger)
+	// channelWorker := telegram.NewTelegramRepository(me, tdlibClient, storageWorker, tgConfigs, logger)
 
-	if err := channelWorker.InitInitialSubscriptions(); err != nil {
-		log.Fatal(err)
-	}
+	// if err := channelWorker.InitInitialSubscriptions(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	cronRepository := cron.NewCronRepository(channelWorker, storageWorker, logger, ctx)
-	cronRepository.Start(me.Id)
+	// cronRepository := cron.NewCronRepository(channelWorker, storageWorker, logger, ctx)
+	// cronRepository.Start(me.Id)
 
-	app := fiber.New()
+	// app := fiber.New()
 
-	httpRepository := http.NewHttpRepository(tgClientAuthorizer, channelWorker, nil)
-	httpRepository.SetupRouts(app)
+	// httpRepository := http.NewHttpRepository(tgClientAuthorizer, channelWorker, nil)
+	// httpRepository.SetupRouts(app)
 
-	// Uuups...
-	// Global variables??))))))
+	// // Uuups...
+	// // Global variables??))))))
 
-	log.Fatal(app.Listen(fmt.Sprintf("%s:%s", httpConfigs.AppHost, httpConfigs.AppPort)))
+	// log.Fatal(app.Listen(fmt.Sprintf("%s:%s", httpConfigs.AppHost, httpConfigs.AppPort)))
 }
