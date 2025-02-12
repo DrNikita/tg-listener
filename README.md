@@ -15,16 +15,6 @@ export CGO_LDFLAGS="-L/Users/nikita/td/tdlib/lib -L/opt/homebrew/lib/ -lssl -lcr
     linux:
 
 export CGO_ENABLED=1
-export CGO_CFLAGS="-I/home/nikita/td/tdlib/include"
-export CGO_LDFLAGS="-L/home/nikita/td/tdlib/lib -ltdjson -ltdutils -ltdclient -lstdc++ -lm"
-
-
-CGO_ENABLED=1
-CGO_CFLAGS=-I/home/nikita/td/tdlib/include
-CGO_LDFLAGS=-L/home/nikita/td/tdlib/lib -ltdjson
-
-
-export CGO_ENABLED=1
 export CGO_CFLAGS="-I$HOME/td/tdlib/include"
 export CGO_LDFLAGS="-L$HOME/td/tdlib/lib -ltdjson"
 export LD_LIBRARY_PATH="$HOME/td/tdlib/lib"
@@ -41,6 +31,9 @@ go build -trimpath -ldflags="-s -w" -o tg-listener.exe main.go
 
 
 ----------------------------------------------------------------------------------------
+
+
+!!!WARN!!!: if client was not destroed correctly after program finished: rm -rf .tdlib/
 
 
 JIRA: [text](https://helllolworld.atlassian.net/jira/software/projects/KAN/boards/1)
