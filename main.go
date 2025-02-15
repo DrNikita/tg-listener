@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"tg-listener/configs"
+	"tg-listener/internal/cron"
+	"tg-listener/internal/db"
 	"tg-listener/internal/telegram"
 	"time"
 
-	"github.com/zelenin/go-tdlib/client"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
@@ -33,7 +34,6 @@ func main() {
 		logger.Error("error connecting to mongo DB", "err", err)
 		log.Fatal(err)
 	}
-
 	defer func() {
 		if err = mongoClient.Disconnect(ctx); err != nil {
 			logger.Error(err.Error())
@@ -41,16 +41,16 @@ func main() {
 		}
 	}()
 
+	mongoRepository := db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
+
 	err = mongoClient.Ping(ctx, readpref.Primary())
 	if err != nil {
 		logger.Error(err.Error())
 		log.Fatal(err)
 	}
 
-	var tgClientAuthorizer telegram.TgClientAuthorizer
-	tgClientAuthorizer = telegram.NewClientRepository(tgConfigs, logger)
-
-	tdlibClient, _, err := tgClientAuthorizer.Authorize()
+	tgClientAuthorizer := telegram.NewClientRepository(tgConfigs, logger)
+	tdlibClient, me, err := tgClientAuthorizer.Authorize()
 	defer func() {
 		meta, err := tdlibClient.Destroy()
 		if err != nil {
@@ -60,33 +60,12 @@ func main() {
 		logger.Info("user was successfully destroed", "@type", meta.Type)
 	}()
 
-	tdlibClientChan := make(chan *client.Client)
-	meChan := make(chan *client.User)
-	defer func() {
-		close(tdlibClientChan)
-		close(meChan)
-	}()
+	chatRepository := telegram.NewChatRepository(me, tdlibClient, mongoRepository, tgConfigs, logger)
+	if err := chatRepository.InitInitialSubscriptions(); err != nil {
+		logger.Error("failed to subscribe for initial cahts", "err", err)
+		log.Fatal(err)
+	}
 
-	///// must be block for all api if user unauthorized
-
-	// storageWorker := db.NewMongoRepository(mongoClient, mongoConfigs, logger, ctx)
-
-	// channelWorker := telegram.NewTelegramRepository(me, tdlibClient, storageWorker, tgConfigs, logger)
-
-	// if err := channelWorker.InitInitialSubscriptions(); err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// cronRepository := cron.NewCronRepository(channelWorker, storageWorker, logger, ctx)
-	// cronRepository.Start(me.Id)
-
-	// app := fiber.New()
-
-	// httpRepository := http.NewHttpRepository(tgClientAuthorizer, channelWorker, nil)
-	// httpRepository.SetupRouts(app)
-
-	// // Uuups...
-	// // Global variables??))))))
-
-	// log.Fatal(app.Listen(fmt.Sprintf("%s:%s", httpConfigs.AppHost, httpConfigs.AppPort)))
+	cronRepository := cron.NewCronRepository(chatRepository, mongoRepository, logger, ctx)
+	cronRepository.Start(me.Id)
 }
