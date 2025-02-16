@@ -108,12 +108,15 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 	chat, err := cr.client.SearchPublicChat(&client.SearchPublicChatRequest{
 		Username: chatTag,
 	})
+	if err != nil {
+		cr.logger.Error("failed to get chat", "err", err)
+		return nil, err
+	}
 
 	messages, err := cr.client.GetChatHistory(&client.GetChatHistoryRequest{
-		ChatId:        chat.Id,
-		FromMessageId: 0,
-		Offset:        0,
-		Limit:         10,
+		ChatId:    chat.Id,
+		Limit:     100,
+		OnlyLocal: false,
 	})
 	if err != nil {
 		cr.logger.Error("get chat messages history error", "chat_id", chatTag, "err", err)
@@ -160,10 +163,13 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 		for messageId, message := range messages.Messages {
 			if message.Id == lastMessage.LastMessageId {
 				messages.Messages = messages.Messages[:messageId]
+				cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
 				return messages, nil
 			}
 		}
 	}
+
+	cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
 
 	return messages, nil
 }

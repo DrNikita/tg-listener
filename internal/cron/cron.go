@@ -3,7 +3,6 @@ package cron
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"sync"
 	"tg-listener/internal/db"
 	"tg-listener/internal/telegram"
@@ -60,7 +59,7 @@ func (cr *CronRepository) Start(clientId int64) {
 			}
 
 			for _, message := range messages.Messages {
-				cr.logger.Info(strconv.FormatBool(message.CanBeSaved))
+				cr.logger.Info(message.Type)
 			}
 		}()
 	}
