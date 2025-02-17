@@ -58,8 +58,9 @@ func (cr *CronRepository) Start(clientId int64) {
 				return
 			}
 
-			for _, message := range messages.Messages {
-				cr.logger.Info(message.Type)
+			mongoMessages := db.NewMessages(messages)
+			if err := cr.store.InsertMessages(mongoMessages); err != nil {
+				cr.logger.Error("failed to save messages", "err", err)
 			}
 		}()
 	}

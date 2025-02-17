@@ -21,7 +21,7 @@ func NewHttpRepository(tgClientAuthorizer telegram.TgClientAuthorizer, chat tele
 	}
 }
 
-func (hr *httpRepository) SetupRouts(app *fiber.App) {
+func (hr httpRepository) SetupRouts(app *fiber.App) {
 	mainGroup := app.Group("/api/v1")
 	mainGroup.Post("/authorize", hr.AuthorizeTgUser)
 }

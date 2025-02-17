@@ -115,7 +115,7 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 
 	messages, err := cr.client.GetChatHistory(&client.GetChatHistoryRequest{
 		ChatId:    chat.Id,
-		Limit:     100,
+		Limit:     10,
 		OnlyLocal: false,
 	})
 	if err != nil {
@@ -123,7 +123,7 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 		return nil, err
 	}
 
-	if messages == nil || len(messages.Messages) == 0 {
+	if messages == nil || messages.TotalCount == 0 {
 		cr.logger.Info("no messages were found")
 
 		return nil, NoMessagesError{
@@ -163,6 +163,7 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 		for messageId, message := range messages.Messages {
 			if message.Id == lastMessage.LastMessageId {
 				messages.Messages = messages.Messages[:messageId]
+				messages.TotalCount = int32(len(messages.Messages))
 				cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
 				return messages, nil
 			}
