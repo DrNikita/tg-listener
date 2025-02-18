@@ -2,7 +2,9 @@ package domen
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"tg-listener/configs"
 	"tg-listener/internal/db"
 	"time"
 )
@@ -54,4 +56,15 @@ func (dr *DomenRepository) BackgroundListening() {
 
 	dr.logger.Info("cron_monitoring started")
 	wg.Wait()
+}
+
+func (dr *DomenRepository) saveMedia(file []byte) (string, error) {
+	appConfigs, err := configs.AppConfig()
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Println(appConfigs.MediaDefaultDirectory)
+
+	return "", nil
 }

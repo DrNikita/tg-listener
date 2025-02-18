@@ -5,9 +5,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
-type HttpConfigs struct {
-	AppHost string `envconfig:"host"`
-	AppPort string `envconfig:"port"`
+type AppConfigs struct {
+	MediaDefaultDirectory string `envconfig:"MEDIA_DEFAULT_DIRECTORY"`
 }
 
 type TgConfigs struct {
@@ -22,25 +21,35 @@ type MongoConfigs struct {
 	Uri string `envconfig:"MONGO_URI"`
 }
 
-func MustConfig() (*HttpConfigs, *TgConfigs, *MongoConfigs, error) {
-	var httpConfigs HttpConfigs
+func AppConfig() (*AppConfigs, error) {
+	var appConfigs AppConfigs
+
+	err := envconfig.Process("", &appConfigs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &appConfigs, nil
+}
+
+func TgConfig() (*TgConfigs, error) {
 	var tgConfigs TgConfigs
+
+	err := envconfig.Process("tg", &tgConfigs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tgConfigs, nil
+}
+
+func MongoConfig() (*MongoConfigs, error) {
 	var mongoConfigs MongoConfigs
 
-	err := envconfig.Process("app", &httpConfigs)
+	err := envconfig.Process("tg", &mongoConfigs)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	err = envconfig.Process("tg", &tgConfigs)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = envconfig.Process("db", &mongoConfigs)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return &httpConfigs, &tgConfigs, &mongoConfigs, nil
+	return &mongoConfigs, nil
 }

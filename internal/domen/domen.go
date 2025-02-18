@@ -29,7 +29,12 @@ func New() (*DomenRepository, func(), func(), error) {
 		AddSource: true,
 	}))
 
-	_, tgConfigs, mongoConfigs, err := configs.MustConfig()
+	tgConfigs, err := configs.TgConfig()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	mongoConfigs, err := configs.MongoConfig()
 	if err != nil {
 		return nil, nil, nil, err
 	}
