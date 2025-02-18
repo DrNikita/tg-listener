@@ -18,35 +18,33 @@ const (
 )
 
 type StorageWorker interface {
-	InsertInitialtListeningChats(listteningChats ListeningChats) error
-	GetListeningChats(userId int64) (*ListeningChats, error)
-	GetChatLastMessage(chatId int64) (*LastMessage, error)
-	InsertLastMessage(lastMessage LastMessage) error
-	UpdateLastMessage(lastMessage LastMessage) (*mongo.UpdateResult, error)
-	InsertMessages(messages []Message) error
-	GetMessages(from time.Time, to time.Time) ([]Message, error)
+	InsertInitialtListeningChats(ctx context.Context, listteningChats ListeningChats) error
+	GetListeningChats(ctx context.Context, userId int64) (*ListeningChats, error)
+	GetChatLastMessage(ctx context.Context, chatId int64) (*LastMessage, error)
+	InsertLastMessage(ctx context.Context, lastMessage LastMessage) error
+	UpdateLastMessage(ctx context.Context, lastMessage LastMessage) (*mongo.UpdateResult, error)
+	InsertMessages(ctx context.Context, messages []Message) error
+	GetMessages(ctx context.Context, from time.Time, to time.Time) ([]Message, error)
 }
 
 type MongoRepository struct {
 	client *mongo.Client
 	config *configs.MongoConfigs
 	logger *slog.Logger
-	ctx    context.Context
 }
 
-func NewMongoRepository(client *mongo.Client, config *configs.MongoConfigs, logger *slog.Logger, ctx context.Context) *MongoRepository {
+func NewMongoRepository(client *mongo.Client, config *configs.MongoConfigs, logger *slog.Logger) *MongoRepository {
 	return &MongoRepository{
 		client: client,
 		config: config,
 		logger: logger,
-		ctx:    ctx,
 	}
 }
 
-func (mr MongoRepository) InsertInitialtListeningChats(listteningChats ListeningChats) error {
+func (mr MongoRepository) InsertInitialtListeningChats(ctx context.Context, listteningChats ListeningChats) error {
 	chatCollection := mr.client.Database(AppCollectionName).Collection(ChatColleaction)
 
-	_, err := chatCollection.InsertOne(mr.ctx, listteningChats)
+	_, err := chatCollection.InsertOne(ctx, listteningChats)
 	if err != nil {
 		mr.logger.Error(err.Error())
 		return err
@@ -55,13 +53,13 @@ func (mr MongoRepository) InsertInitialtListeningChats(listteningChats Listening
 	return nil
 }
 
-func (mr MongoRepository) GetListeningChats(userId int64) (*ListeningChats, error) {
+func (mr MongoRepository) GetListeningChats(ctx context.Context, userId int64) (*ListeningChats, error) {
 	chatCollection := mr.client.Database(AppCollectionName).Collection(ChatColleaction)
 
 	var listeningChats ListeningChats
 
 	userIdFilter := bson.D{{"user_id", userId}}
-	err := chatCollection.FindOne(mr.ctx, userIdFilter).Decode(&listeningChats)
+	err := chatCollection.FindOne(ctx, userIdFilter).Decode(&listeningChats)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +69,13 @@ func (mr MongoRepository) GetListeningChats(userId int64) (*ListeningChats, erro
 	return &listeningChats, nil
 }
 
-func (mr MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error) {
+func (mr MongoRepository) GetChatLastMessage(ctx context.Context, chatId int64) (*LastMessage, error) {
 	lastMessageCollection := mr.client.Database(AppCollectionName).Collection(LastMessageCollection)
 
 	var lastMessage LastMessage
 
 	chatIdFilter := bson.D{{"chat_id", chatId}}
-	err := lastMessageCollection.FindOne(mr.ctx, chatIdFilter).Decode(&lastMessage)
+	err := lastMessageCollection.FindOne(ctx, chatIdFilter).Decode(&lastMessage)
 	if err != nil {
 		mr.logger.Error("failed to get last message", "err", err)
 		return nil, err
@@ -86,10 +84,10 @@ func (mr MongoRepository) GetChatLastMessage(chatId int64) (*LastMessage, error)
 	return &lastMessage, nil
 }
 
-func (mr MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
+func (mr MongoRepository) InsertLastMessage(ctx context.Context, lastMessage LastMessage) error {
 	lastMessageCollection := mr.client.Database(AppCollectionName).Collection(LastMessageCollection)
 
-	_, err := lastMessageCollection.InsertOne(mr.ctx, lastMessage)
+	_, err := lastMessageCollection.InsertOne(ctx, lastMessage)
 	if err != nil {
 		mr.logger.Error("failed to save last message", "err", err)
 		return err
@@ -100,13 +98,13 @@ func (mr MongoRepository) InsertLastMessage(lastMessage LastMessage) error {
 	return nil
 }
 
-func (mr MongoRepository) UpdateLastMessage(lastMessage LastMessage) (*mongo.UpdateResult, error) {
+func (mr MongoRepository) UpdateLastMessage(ctx context.Context, lastMessage LastMessage) (*mongo.UpdateResult, error) {
 	lastMessageCollection := mr.client.Database(AppCollectionName).Collection(LastMessageCollection)
 
 	chatIdFilter := bson.D{{"chat_id", lastMessage.ChatId}}
 	update := bson.D{{"$set", lastMessage}}
 
-	updateResult, err := lastMessageCollection.UpdateOne(mr.ctx, chatIdFilter, update)
+	updateResult, err := lastMessageCollection.UpdateOne(ctx, chatIdFilter, update)
 	if err != nil {
 		mr.logger.Error("failed to update last message", "err", err)
 		return nil, err
@@ -117,10 +115,10 @@ func (mr MongoRepository) UpdateLastMessage(lastMessage LastMessage) (*mongo.Upd
 	return updateResult, nil
 }
 
-func (mr MongoRepository) InsertMessages(messages []Message) error {
+func (mr MongoRepository) InsertMessages(ctx context.Context, messages []Message) error {
 	messageCollection := mr.client.Database(AppCollectionName).Collection(MessageCollection)
 
-	_, err := messageCollection.InsertMany(mr.ctx, messages)
+	_, err := messageCollection.InsertMany(ctx, messages)
 	if err != nil {
 		return err
 	}
@@ -128,6 +126,6 @@ func (mr MongoRepository) InsertMessages(messages []Message) error {
 	return nil
 }
 
-func (mr MongoRepository) GetMessages(from time.Time, to time.Time) ([]Message, error) {
+func (mr MongoRepository) GetMessages(ctx context.Context, from time.Time, to time.Time) ([]Message, error) {
 	return nil, nil
 }

@@ -26,8 +26,8 @@ func NewMessage(msg *client.Message) (Message, error) {
 		return Message{
 			Content: Content{
 				Type: ContentPhoto,
-				// Path: "",
 				Text: content.Caption.Text,
+				// Path: "",
 				File: content.Photo.Minithumbnail.Data,
 			},
 			CreatedAt: time.Now(),
@@ -36,8 +36,8 @@ func NewMessage(msg *client.Message) (Message, error) {
 		return Message{
 			Content: Content{
 				Type: ContentVideo,
-				// Path: "",
 				Text: content.Caption.Text,
+				// Path: "",
 				File: content.Video.Minithumbnail.Data,
 			},
 			CreatedAt: time.Now(),

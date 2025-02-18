@@ -1,9 +1,12 @@
 package telegram
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
+	"path/filepath"
 	"tg-listener/configs"
 	"tg-listener/internal/db"
 
@@ -11,10 +14,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-type TgChatWorker interface {
-	InitInitialSubscriptions() error
-	Subscribe(chatTag string) (*client.Chat, error)
-	GetNewMessages(chatTag string) (*client.Messages, error)
+type TDLibAPIProvider interface {
+	InitInitialSubscriptions(ctx context.Context) error
+	Subscribe(ctx context.Context, chatTag string) (*client.Chat, error)
+	GetNewMessages(ctx context.Context, chatTag string) (*client.Messages, error)
+	GetAuthorizedUserID() int64
 }
 
 type NoMessagesError struct {
@@ -34,20 +38,89 @@ type chatRepository struct {
 	logger   *slog.Logger
 }
 
-func NewChatRepository(me *client.User, client *client.Client, store db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger) *chatRepository {
+func New(store db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger) (*chatRepository, func(), error) {
+	tdlibParameters := &client.SetTdlibParametersRequest{
+		UseTestDc:           false,
+		DatabaseDirectory:   filepath.Join(".tdlib", "database"),
+		FilesDirectory:      filepath.Join(".tdlib", "files"),
+		UseFileDatabase:     true,
+		UseChatInfoDatabase: true,
+		UseMessageDatabase:  true,
+		UseSecretChats:      false,
+		ApiId:               config.ApiID,
+		ApiHash:             config.ApiHash,
+		SystemLanguageCode:  "en",
+		DeviceModel:         "Server",
+		SystemVersion:       "1.0.0",
+		ApplicationVersion:  "1.0.0",
+	}
+
+	authorizer := client.ClientAuthorizer(tdlibParameters)
+	go client.CliInteractor(authorizer)
+
+	_, err := client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
+		NewVerbosityLevel: 1,
+	})
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil, err
+	}
+
+	tdlibClient, err := client.NewClient(authorizer)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil, err
+	}
+
+	versionOption, err := client.GetOption(&client.GetOptionRequest{
+		Name: "version",
+	})
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil, err
+	}
+
+	commitOption, err := client.GetOption(&client.GetOptionRequest{
+		Name: "commit_hash",
+	})
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil, err
+	}
+
+	log.Printf("TDLib version: %s (commit: %s)", versionOption.(*client.OptionValueString).Value, commitOption.(*client.OptionValueString).Value)
+
+	me, err := tdlibClient.GetMe()
+
+	destroyClient := func() {
+		meta, err := tdlibClient.Destroy()
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+		logger.Info("user was successfully destroed", "@type", meta.Type)
+	}
+
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, destroyClient, err
+	}
+
+	logger.Info("user was successfully authorized", "Me", me.FirstName+" "+me.LastName)
+
 	return &chatRepository{
 		me:       me,
-		client:   client,
+		client:   tdlibClient,
 		chatList: make(map[string]int64),
 		store:    store,
 		config:   config,
 		logger:   logger,
-	}
+	}, destroyClient, nil
 }
 
 // initialization of initial subscriptions
-func (cr *chatRepository) InitInitialSubscriptions() error {
-	listeningChats, err := cr.store.GetListeningChats(cr.me.Id)
+func (cr *chatRepository) InitInitialSubscriptions(ctx context.Context) error {
+	listeningChats, err := cr.store.GetListeningChats(ctx, cr.me.Id)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		// list of initial chats for listening
 		listeningChatTags := []string{
@@ -56,13 +129,13 @@ func (cr *chatRepository) InitInitialSubscriptions() error {
 		}
 
 		for _, chatTag := range listeningChatTags {
-			_, err := cr.Subscribe(chatTag)
+			_, err := cr.Subscribe(ctx, chatTag)
 			if err != nil {
 				cr.logger.Error("coulnt subscrite to chat", "chat_tag", chatTag, "err", err)
 			}
 		}
 
-		if err := cr.initListeningChats(); err != nil {
+		if err := cr.initListeningChats(ctx); err != nil {
 			return err
 		}
 
@@ -82,7 +155,7 @@ func (cr *chatRepository) InitInitialSubscriptions() error {
 }
 
 // TODO: refactor: remove *client.Chat as returnning param: seems like chat param is only need to check chatTag
-func (cr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
+func (cr *chatRepository) Subscribe(ctx context.Context, chatTag string) (*client.Chat, error) {
 	chatId, err := cr.getChatId(chatTag)
 	if err != nil {
 		cr.logger.Error("chat id not found", "err", err)
@@ -104,7 +177,7 @@ func (cr *chatRepository) Subscribe(chatTag string) (*client.Chat, error) {
 }
 
 // get new message since last messages request
-func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, error) {
+func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*client.Messages, error) {
 	chat, err := cr.client.SearchPublicChat(&client.SearchPublicChatRequest{
 		Username: chatTag,
 	})
@@ -135,9 +208,9 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 
 	// important to save this to get rid of duplicated requests with the same messages ->
 	// -> return error if failed to inserte/update
-	lastMessage, err := cr.store.GetChatLastMessage(chat.Id)
+	lastMessage, err := cr.store.GetChatLastMessage(ctx, chat.Id)
 	if err != nil {
-		err = cr.store.InsertLastMessage(db.LastMessage{
+		err = cr.store.InsertLastMessage(ctx, db.LastMessage{
 			ChatId:        chat.Id,
 			LastMessageId: messages.Messages[0].Id,
 		})
@@ -149,7 +222,7 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 		return messages, nil
 
 	} else {
-		_, err = cr.store.UpdateLastMessage(db.LastMessage{
+		_, err = cr.store.UpdateLastMessage(ctx, db.LastMessage{
 			ChatId:        chat.Id,
 			LastMessageId: messages.Messages[0].Id,
 		})
@@ -176,7 +249,7 @@ func (cr *chatRepository) GetNewMessages(chatTag string) (*client.Messages, erro
 }
 
 // service functions for saving listening chats
-func (cr *chatRepository) initListeningChats() error {
+func (cr *chatRepository) initListeningChats(ctx context.Context) error {
 	var listeningChats []db.TgListeningChat
 
 	for chatTag, chatId := range cr.chatList {
@@ -191,7 +264,7 @@ func (cr *chatRepository) initListeningChats() error {
 		ListeningChats: listeningChats,
 	}
 
-	if err := cr.store.InsertInitialtListeningChats(initialChats); err != nil {
+	if err := cr.store.InsertInitialtListeningChats(ctx, initialChats); err != nil {
 		cr.logger.Error(err.Error())
 		return err
 	}
@@ -211,4 +284,8 @@ func (cr *chatRepository) getChatId(chatTag string) (int64, error) {
 	cr.logger.Info("Chat found", "chatId", chat.Id)
 
 	return chat.Id, nil
+}
+
+func (cr *chatRepository) GetAuthorizedUserID() int64 {
+	return cr.me.Id
 }

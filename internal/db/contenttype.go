@@ -29,5 +29,5 @@ type Content struct {
 	Type ContentEnumerator `bson:"type"`
 	Path string            `bson:"path"`
 	Text string            `bson:"text"`
-	File []byte            `bson:"file"`
+	File []byte            `bson:"-"`
 }
