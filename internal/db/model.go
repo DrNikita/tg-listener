@@ -8,7 +8,7 @@ import (
 )
 
 type Message struct {
-	Content
+	Content   `bson:",inline"`
 	CreatedAt time.Time `bson:"created_at"`
 }
 
