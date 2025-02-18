@@ -46,7 +46,7 @@ func TgConfig() (*TgConfigs, error) {
 func MongoConfig() (*MongoConfigs, error) {
 	var mongoConfigs MongoConfigs
 
-	err := envconfig.Process("tg", &mongoConfigs)
+	err := envconfig.Process("db", &mongoConfigs)
 	if err != nil {
 		return nil, err
 	}

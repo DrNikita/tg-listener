@@ -18,7 +18,9 @@ type TDLibAPIProvider interface {
 	InitInitialSubscriptions(ctx context.Context) error
 	Subscribe(ctx context.Context, chatTag string) (*client.Chat, error)
 	GetNewMessages(ctx context.Context, chatTag string) (*client.Messages, error)
+	GetMediaFile(mediaID int32) (*client.File, error)
 	GetAuthorizedUserID() int64
+	DownlaodFile(fileID int32) (*client.File, error)
 }
 
 type NoMessagesError struct {
@@ -246,6 +248,35 @@ func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*
 	cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
 
 	return messages, nil
+}
+
+// get file by id
+func (cr *chatRepository) GetMediaFile(fileID int32) (*client.File, error) {
+	file, err := cr.client.GetFile(&client.GetFileRequest{
+		FileId: fileID,
+	})
+	if err != nil {
+		cr.logger.Error("error getting file:", "err", err)
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (cr *chatRepository) DownlaodFile(fileID int32) (*client.File, error) {
+	file, err := cr.client.DownloadFile(&client.DownloadFileRequest{
+		FileId:      fileID,
+		Priority:    1, // Приоритет загрузки
+		Offset:      0, // Скачиваем с начала
+		Limit:       0, // Полный файл
+		Synchronous: true,
+	})
+	if err != nil {
+		fmt.Println("Error downloading file:", err)
+		return nil, err
+	}
+
+	return file, nil
 }
 
 // service functions for saving listening chats

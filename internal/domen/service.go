@@ -3,10 +3,13 @@ package domen
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"tg-listener/configs"
 	"tg-listener/internal/db"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (dr *DomenRepository) BackgroundListening() {
@@ -48,6 +51,13 @@ func (dr *DomenRepository) BackgroundListening() {
 			}
 
 			mongoMessages := db.NewMessages(messages)
+
+			for i, msg := range mongoMessages {
+				if path, err := dr.saveMedia(msg.MediaID); err != nil {
+					mongoMessages[i].Path = path
+				}
+			}
+
 			if err := dr.store.InsertMessages(ctx, mongoMessages); err != nil {
 				dr.logger.Error("failed to save messages", "err", err)
 			}
@@ -58,7 +68,7 @@ func (dr *DomenRepository) BackgroundListening() {
 	wg.Wait()
 }
 
-func (dr *DomenRepository) saveMedia(file []byte) (string, error) {
+func (dr *DomenRepository) saveMedia(fileID int32) (string, error) {
 	appConfigs, err := configs.AppConfig()
 	if err != nil {
 		return "", err
@@ -66,5 +76,37 @@ func (dr *DomenRepository) saveMedia(file []byte) (string, error) {
 
 	fmt.Println(appConfigs.MediaDefaultDirectory)
 
-	return "", nil
+	mediaFile, err := dr.chatWorker.GetMediaFile(fileID)
+	if err != nil {
+		return "", err
+	}
+
+	if mediaFile.Local.IsDownloadingCompleted {
+		dr.logger.Info("media file already downloaded", "file path", mediaFile.Local.Path)
+		return mediaFile.Local.Path, nil
+	}
+
+	downloadedFile, err := dr.chatWorker.DownlaodFile(fileID)
+
+	saveFile(downloadedFile.Local.Path)
+
+	return downloadedFile.Local.Path, nil
+}
+
+func saveFile(filePath string) {
+	newPath := "./downloads/" + uuid.New().String() + ".jpg"
+
+	input, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+
+	err = os.WriteFile(newPath, input, 0644)
+	if err != nil {
+		fmt.Println("Error saving file:", err)
+		return
+	}
+
+	fmt.Println("File saved successfully:", newPath)
 }

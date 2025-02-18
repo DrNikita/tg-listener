@@ -9,10 +9,14 @@ const (
 	ContentText ContentType = iota
 	ContentPhoto
 	ContentVideo
+	ContentVoice
+	ContentDocument
 
-	ContentTextString  string = "TEXT"
-	ContentPhotoString string = "PHOTO"
-	ContentVideoString string = "VIDEO"
+	ContentTextString     string = "TEXT"
+	ContentPhotoString    string = "PHOTO"
+	ContentVideoString    string = "VIDEO"
+	ContentVoiceString    string = "VOICE"
+	ContentDocumentString string = "DOCUMENT"
 )
 
 type ContentType int
@@ -26,8 +30,8 @@ func (ct ContentType) Index() int {
 }
 
 type Content struct {
-	Type ContentEnumerator `bson:"type"`
-	Path string            `bson:"path"`
-	Text string            `bson:"text"`
-	File []byte            `bson:"-"`
+	Type    ContentEnumerator `bson:"type"`
+	Path    string            `bson:"path"`
+	Text    string            `bson:"text"`
+	MediaID int32             `bson:"-"`
 }
