@@ -18,7 +18,7 @@ type TDLibAPIProvider interface {
 	InitInitialSubscriptions(ctx context.Context) error
 	Subscribe(ctx context.Context, chatTag string) (*client.Chat, error)
 	GetNewMessages(ctx context.Context, chatTag string) (*client.Messages, error)
-	GetMediaFile(mediaID int32) (*client.File, error)
+	GetFile(mediaID int32) (*client.File, error)
 	GetAuthorizedUserID() int64
 	DownlaodFile(fileID int32) (*client.File, error)
 }
@@ -43,8 +43,8 @@ type chatRepository struct {
 func New(store db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger) (*chatRepository, func(), error) {
 	tdlibParameters := &client.SetTdlibParametersRequest{
 		UseTestDc:           false,
-		DatabaseDirectory:   filepath.Join(".tdlib", "database"),
-		FilesDirectory:      filepath.Join(".tdlib", "files"),
+		DatabaseDirectory:   filepath.Join(config.StoreDefaultDir, "database"),
+		FilesDirectory:      filepath.Join(config.StoreDefaultDir, "files"),
 		UseFileDatabase:     true,
 		UseChatInfoDatabase: true,
 		UseMessageDatabase:  true,
@@ -58,6 +58,7 @@ func New(store db.StorageWorker, config *configs.TgConfigs, logger *slog.Logger)
 	}
 
 	authorizer := client.ClientAuthorizer(tdlibParameters)
+
 	go client.CliInteractor(authorizer)
 
 	_, err := client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
@@ -251,7 +252,7 @@ func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*
 }
 
 // get file by id
-func (cr *chatRepository) GetMediaFile(fileID int32) (*client.File, error) {
+func (cr *chatRepository) GetFile(fileID int32) (*client.File, error) {
 	file, err := cr.client.GetFile(&client.GetFileRequest{
 		FileId: fileID,
 	})
@@ -272,11 +273,15 @@ func (cr *chatRepository) DownlaodFile(fileID int32) (*client.File, error) {
 		Synchronous: true,
 	})
 	if err != nil {
-		fmt.Println("Error downloading file:", err)
+		cr.logger.Error("error downloading file", "err", err)
 		return nil, err
 	}
 
 	return file, nil
+}
+
+func (cr *chatRepository) GetAuthorizedUserID() int64 {
+	return cr.me.Id
 }
 
 // service functions for saving listening chats
@@ -315,8 +320,4 @@ func (cr *chatRepository) getChatId(chatTag string) (int64, error) {
 	cr.logger.Info("Chat found", "chatId", chat.Id)
 
 	return chat.Id, nil
-}
-
-func (cr *chatRepository) GetAuthorizedUserID() int64 {
-	return cr.me.Id
 }

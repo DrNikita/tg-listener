@@ -25,6 +25,8 @@ type StorageWorker interface {
 	UpdateLastMessage(ctx context.Context, lastMessage LastMessage) (*mongo.UpdateResult, error)
 	InsertMessages(ctx context.Context, messages []Message) error
 	GetMessages(ctx context.Context, from time.Time, to time.Time) ([]Message, error)
+	//TODO:remove
+	DropDB(ctx context.Context) error
 }
 
 type MongoRepository struct {
@@ -128,4 +130,13 @@ func (mr MongoRepository) InsertMessages(ctx context.Context, messages []Message
 
 func (mr MongoRepository) GetMessages(ctx context.Context, from time.Time, to time.Time) ([]Message, error) {
 	return nil, nil
+}
+
+// TODO:remove
+func (mr MongoRepository) DropDB(ctx context.Context) error {
+	if err := mr.client.Database(AppCollectionName).Drop(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }

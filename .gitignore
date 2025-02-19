@@ -4,4 +4,5 @@ logs.txt
 td/
 .tdlib
 .vscode/
+/tdlib
 /media

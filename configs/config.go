@@ -10,15 +10,16 @@ type AppConfigs struct {
 }
 
 type TgConfigs struct {
-	ApiID       int32  `envconfig:"api_id"`
-	ApiHash     string `envconfig:"api_hash"`
-	PhoneNumber string `envconfig:"phone_number"`
-	AuthCode    string `envconfig:"auth_code"`
-	TestChatTag string `envconfig:"chat_tag"`
+	ApiID           int32  `envconfig:"api_id"`
+	ApiHash         string `envconfig:"api_hash"`
+	PhoneNumber     string `envconfig:"phone_number"`
+	AuthCode        string `envconfig:"auth_code"`
+	TestChatTag     string `envconfig:"chat_tag"`
+	StoreDefaultDir string `envconfig:"store_default_dir"`
 }
 
 type MongoConfigs struct {
-	Uri string `envconfig:"MONGO_URI"`
+	Uri string `envconfig:"mongo_uri"`
 }
 
 func AppConfig() (*AppConfigs, error) {

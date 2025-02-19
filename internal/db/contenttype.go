@@ -30,8 +30,8 @@ func (ct ContentType) Index() int {
 }
 
 type Content struct {
-	Type    ContentEnumerator `bson:"type"`
-	Path    string            `bson:"path"`
-	Text    string            `bson:"text"`
-	MediaID int32             `bson:"-"`
+	Type   ContentEnumerator `bson:"type"`
+	Path   string            `bson:"path"`
+	Text   string            `bson:"text"`
+	FileID int32             `bson:"file_id"`
 }

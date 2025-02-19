@@ -25,36 +25,37 @@ func NewMessage(msg *client.Message) (Message, error) {
 	case *client.MessagePhoto:
 		return Message{
 			Content: Content{
-				Type:    ContentPhoto,
-				Text:    content.Caption.Text,
-				MediaID: content.Photo.Sizes[len(content.Photo.Sizes)-1].Photo.Id,
+				Type: ContentPhoto,
+				//TODO: mb there is a better way to get Photo text (existing method)
+				Text:   content.Caption.Text,
+				FileID: content.Photo.Sizes[len(content.Photo.Sizes)-1].Photo.Id,
 			},
 			CreatedAt: time.Now(),
 		}, nil
 	case *client.MessageVideo:
 		return Message{
 			Content: Content{
-				Type:    ContentVideo,
-				Text:    content.Caption.Text,
-				MediaID: content.Video.Video.Id,
+				Type:   ContentVideo,
+				Text:   content.Caption.Text,
+				FileID: content.Video.Video.Id,
 			},
 			CreatedAt: time.Now(),
 		}, nil
 	case *client.MessageVoiceNote:
 		return Message{
 			Content: Content{
-				Type:    ContentVoice,
-				Text:    content.Caption.Text,
-				MediaID: content.VoiceNote.Voice.Id,
+				Type:   ContentVoice,
+				Text:   content.Caption.Text,
+				FileID: content.VoiceNote.Voice.Id,
 			},
 			CreatedAt: time.Now(),
 		}, nil
 	case *client.MessageDocument:
 		return Message{
 			Content: Content{
-				Type:    ContentDocument,
-				Text:    content.Caption.Text,
-				MediaID: content.Document.Document.Id,
+				Type:   ContentDocument,
+				Text:   content.Caption.Text,
+				FileID: content.Document.Document.Id,
 			},
 			CreatedAt: time.Now(),
 		}, nil
