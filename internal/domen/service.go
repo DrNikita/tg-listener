@@ -29,7 +29,6 @@ func (dr *DomenRepository) BackgroundListening() {
 		return
 	}
 
-	// errPull := make(chan error, 10)
 	wg := sync.WaitGroup{}
 
 	for _, chat := range avaliableChats.ListeningChats {
@@ -58,7 +57,6 @@ func (dr *DomenRepository) BackgroundListening() {
 			for i, msg := range mongoMessages {
 				if path, err := dr.saveFile(msg.FileID); err != nil {
 					mongoMessages[i].Path = path
-					fmt.Println("_____________________________________________", mongoMessages[i].Path)
 				}
 			}
 
