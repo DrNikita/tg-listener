@@ -37,5 +37,3 @@ go build -trimpath -ldflags="-s -w" -o tg-listener.exe main.go
 
 
 JIRA: [text](https://helllolworld.atlassian.net/jira/software/projects/KAN/boards/1)
-
-# DEAD...

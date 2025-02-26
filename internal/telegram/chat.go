@@ -241,6 +241,7 @@ func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*
 				messages.Messages = messages.Messages[:messageId]
 				messages.TotalCount = int32(len(messages.Messages))
 				cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
+
 				return messages, nil
 			}
 		}
@@ -250,6 +251,40 @@ func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*
 
 	return messages, nil
 }
+
+// func (cr *chatRepository) Get() {
+// 	// TODO: test log
+// 	msgThread, err := cr.client.GetMessageThreadHistory(&client.GetMessageThreadHistoryRequest{
+// 		ChatId:    messages.Messages[0].ChatId,
+// 		MessageId: messages.Messages[0].Id,
+// 		Limit:     10000,
+// 	})
+
+// 	if err != nil {
+// 		cr.logger.Error("error getting message thread", "err", err)
+// 		return nil, err
+// 	}
+// 	if len(msgThread.Messages) != 0 {
+// 		fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::::::::", msgThread.Messages[0].SenderId)
+// 		// fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::::::::", msgThread.Messages[0].ImportInfo.SenderName)
+// 	}
+// }
+// func (cr *chatRepository) GetUserInfo(userId int) {
+// 	msgThread, err := cr.client.GetMessageThreadHistory(&client.GetMessageThreadHistoryRequest{
+// 		ChatId:    messages.Messages[0].ChatId,
+// 		MessageId: messages.Messages[0].Id,
+// 		Limit:     10000,
+// 	})
+
+// 	if err != nil {
+// 		cr.logger.Error("error getting message thread", "err", err)
+// 		return nil, err
+// 	}
+// 	if len(msgThread.Messages) != 0 {
+// 		fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::::::::", msgThread.Messages[0].SenderId)
+// 		// fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::::::::", msgThread.Messages[0].ImportInfo.SenderName)
+// 	}
+// }
 
 // get file by id
 func (cr *chatRepository) GetFile(fileID int32) (*client.File, error) {
