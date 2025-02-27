@@ -1,79 +1,13 @@
 package db
 
 import (
-	"errors"
 	"time"
-
-	"github.com/zelenin/go-tdlib/client"
 )
 
 type Message struct {
 	Content   `bson:",inline"`
+	SenderIDs []int64   `bson:"sender_id"`
 	CreatedAt time.Time `bson:"created_at"`
-}
-
-func NewMessage(msg *client.Message) (Message, error) {
-	switch content := msg.Content.(type) {
-	case *client.MessageText:
-		return Message{
-			Content: Content{
-				Type: ContentText,
-				Text: content.Text.Text,
-			},
-			CreatedAt: time.Now(),
-		}, nil
-	case *client.MessagePhoto:
-		return Message{
-			Content: Content{
-				Type: ContentPhoto,
-				//TODO: mb there is a better way to get Photo text (existing method)
-				Text:   content.Caption.Text,
-				FileID: content.Photo.Sizes[len(content.Photo.Sizes)-1].Photo.Id,
-			},
-			CreatedAt: time.Now(),
-		}, nil
-	case *client.MessageVideo:
-		return Message{
-			Content: Content{
-				Type:   ContentVideo,
-				Text:   content.Caption.Text,
-				FileID: content.Video.Video.Id,
-			},
-			CreatedAt: time.Now(),
-		}, nil
-	case *client.MessageVoiceNote:
-		return Message{
-			Content: Content{
-				Type:   ContentVoice,
-				Text:   content.Caption.Text,
-				FileID: content.VoiceNote.Voice.Id,
-			},
-			CreatedAt: time.Now(),
-		}, nil
-	case *client.MessageDocument:
-		return Message{
-			Content: Content{
-				Type:   ContentDocument,
-				Text:   content.Caption.Text,
-				FileID: content.Document.Document.Id,
-			},
-			CreatedAt: time.Now(),
-		}, nil
-	default:
-		return Message{}, errors.New("incorrect message type")
-	}
-}
-
-func NewMessages(tgMsg *client.Messages) []Message {
-	mongoMessages := make([]Message, tgMsg.TotalCount)
-
-	for _, msg := range tgMsg.Messages {
-		if mongoMsg, err := NewMessage(msg); err == nil {
-			mongoMessages = append(mongoMessages, mongoMsg)
-		}
-	}
-
-	return mongoMessages
 }
 
 type ListeningChats struct {

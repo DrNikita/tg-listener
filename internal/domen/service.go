@@ -2,11 +2,14 @@ package domen
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"tg-listener/configs"
 	"tg-listener/internal/db"
 	"time"
+
+	"github.com/zelenin/go-tdlib/client"
 )
 
 func (dr *DomenRepository) BackgroundListening() {
@@ -52,7 +55,24 @@ func (dr *DomenRepository) BackgroundListening() {
 				return
 			}
 
-			mongoMessages := db.NewMessages(messages)
+			mongoMessages := make([]db.Message, 0)
+			for _, msg := range messages.Messages {
+
+				if mongoMessage, err := newMongoMessage(msg); err == nil {
+
+					commentstorIDs := make([]int64, 0)
+
+					if comments, err := dr.chatWorker.GetComments(msg.Id, msg.ChatId); err == nil {
+						for _, comment := range comments {
+							commentstorIDs = append(commentstorIDs, getSenderId(comment))
+						}
+
+						mongoMessage.SenderIDs = commentstorIDs
+					}
+
+					mongoMessages = append(mongoMessages, mongoMessage)
+				}
+			}
 
 			for i, msg := range mongoMessages {
 				if path, err := dr.saveFile(msg.FileID); err != nil {
@@ -68,6 +88,9 @@ func (dr *DomenRepository) BackgroundListening() {
 
 	dr.logger.Info("cron_monitoring started")
 	wg.Wait()
+}
+
+func (dr *DomenRepository) Spam() {
 }
 
 func (dr *DomenRepository) saveFile(fileID int32) (string, error) {
@@ -95,4 +118,67 @@ func (dr *DomenRepository) saveFile(fileID int32) (string, error) {
 	}
 
 	return downloadedFile.Local.Path, nil
+}
+
+func newMongoMessage(msg *client.Message) (db.Message, error) {
+	switch content := msg.Content.(type) {
+	case *client.MessageText:
+		return db.Message{
+			Content: db.Content{
+				Type: db.ContentText,
+				Text: content.Text.Text,
+			},
+			CreatedAt: time.Now(),
+		}, nil
+	case *client.MessagePhoto:
+		return db.Message{
+			Content: db.Content{
+				Type: db.ContentPhoto,
+				//TODO: mb there is a better way to get Photo text (existing method)
+				Text:   content.Caption.Text,
+				FileID: content.Photo.Sizes[len(content.Photo.Sizes)-1].Photo.Id,
+			},
+			CreatedAt: time.Now(),
+		}, nil
+	case *client.MessageVideo:
+		return db.Message{
+			Content: db.Content{
+				Type:   db.ContentVideo,
+				Text:   content.Caption.Text,
+				FileID: content.Video.Video.Id,
+			},
+			CreatedAt: time.Now(),
+		}, nil
+	case *client.MessageVoiceNote:
+		return db.Message{
+			Content: db.Content{
+				Type:   db.ContentVoice,
+				Text:   content.Caption.Text,
+				FileID: content.VoiceNote.Voice.Id,
+			},
+			CreatedAt: time.Now(),
+		}, nil
+	case *client.MessageDocument:
+		return db.Message{
+			Content: db.Content{
+				Type:   db.ContentDocument,
+				Text:   content.Caption.Text,
+				FileID: content.Document.Document.Id,
+			},
+			CreatedAt: time.Now(),
+		}, nil
+	default:
+		return db.Message{}, errors.New("incorrect message type")
+	}
+}
+
+func getSenderId(msg *client.Message) int64 {
+	switch sender := msg.SenderId.(type) {
+	case *client.MessageSenderUser:
+		return sender.UserId
+	case *client.MessageSenderChat:
+		return sender.ChatId
+	default:
+		return 0
+	}
 }

@@ -16,7 +16,9 @@ import (
 
 type TDLibAPIProvider interface {
 	InitInitialSubscriptions(ctx context.Context) error
-	Subscribe(ctx context.Context, chatTag string) (*client.Chat, error)
+	GetChat(ctx context.Context, chatTag string) (*client.Chat, error)
+	GetComments(msgID, chatID int64) ([]*client.Message, error)
+	GetUser(ctx context.Context, userID int64) (*client.User, error)
 	GetNewMessages(ctx context.Context, chatTag string) (*client.Messages, error)
 	GetFile(mediaID int32) (*client.File, error)
 	GetAuthorizedUserID() int64
@@ -128,11 +130,10 @@ func (cr *chatRepository) InitInitialSubscriptions(ctx context.Context) error {
 		// list of initial chats for listening
 		listeningChatTags := []string{
 			"@evelone192gg",
-			"@FlattyBy",
 		}
 
 		for _, chatTag := range listeningChatTags {
-			_, err := cr.Subscribe(ctx, chatTag)
+			_, err := cr.GetChat(ctx, chatTag)
 			if err != nil {
 				cr.logger.Error("coulnt subscrite to chat", "chat_tag", chatTag, "err", err)
 			}
@@ -158,7 +159,7 @@ func (cr *chatRepository) InitInitialSubscriptions(ctx context.Context) error {
 }
 
 // TODO: refactor: remove *client.Chat as returnning param: seems like chat param is only need to check chatTag
-func (cr *chatRepository) Subscribe(ctx context.Context, chatTag string) (*client.Chat, error) {
+func (cr *chatRepository) GetChat(ctx context.Context, chatTag string) (*client.Chat, error) {
 	chatId, err := cr.getChatId(chatTag)
 	if err != nil {
 		cr.logger.Error("chat id not found", "err", err)
@@ -250,6 +251,32 @@ func (cr *chatRepository) GetNewMessages(ctx context.Context, chatTag string) (*
 	cr.logger.Info("new messages count", "chat_tag", chatTag, "count", len(messages.Messages))
 
 	return messages, nil
+}
+
+func (cr *chatRepository) GetUser(ctx context.Context, userID int64) (*client.User, error) {
+	usr, err := cr.client.GetUser(&client.GetUserRequest{
+		UserId: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return usr, nil
+}
+
+func (cr *chatRepository) GetComments(msgID, chatID int64) ([]*client.Message, error) {
+	msgThread, err := cr.client.GetMessageThreadHistory(&client.GetMessageThreadHistoryRequest{
+		ChatId:    0,
+		MessageId: msgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if msgThread == nil || len(msgThread.Messages) == 0 {
+		return nil, errors.New("no comments")
+	}
+
+	return msgThread.Messages, nil
 }
 
 // func (cr *chatRepository) Get() {
