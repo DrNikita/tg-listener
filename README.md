@@ -34,6 +34,3 @@ go build -trimpath -ldflags="-s -w" -o tg-listener.exe main.go
 
 
 !!!WARN!!!: if client was not destroed correctly after program finished: rm -rf .tdlib/
-
-
-JIRA: [text](https://helllolworld.atlassian.net/jira/software/projects/KAN/boards/1)
